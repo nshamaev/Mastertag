@@ -52,6 +52,5 @@ class TagThriftServiceSpec extends Specification {
       Note(note2.id, note2.name, Seq(tag)),
       Note(note3.id, note3.name, Seq(tag))
     )
-    //notes must haveLength(1)
   }
 }
