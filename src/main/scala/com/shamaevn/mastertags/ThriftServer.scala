@@ -1,5 +1,6 @@
 package com.shamaevn.mastertags
 
+import com.shamaevn.mastertags.db.{TagModel, NoteModel, Database}
 import com.twitter.finagle.builder.ServerBuilder
 import com.twitter.finagle.thrift.ThriftServerFramedCodec
 import com.twitter.util.Future
@@ -20,47 +21,53 @@ object ThriftServer {
   }
 }
 
-class TagServiceImplementation extends TagService.FutureIface {
+class TagServiceImplementation extends TagService.FutureIface with ThriftUtil {
 
   def createNote(name: String): Future[Note] = {
-    val note = Database.createNote(name)
-    Future.value(Note(note.id, note.name))
+    val note = NoteModel.createNote(name)
+    Future.value(serializeNote(note))
   }
 
   def addTagToNote(tagName: String, noteId: Long): Future[Tag] = {
-    val tag = Database.addTagToNote(tagName, noteId)
-    Future.value(Tag(tag.id, tag.name))
+    val tag = NoteModel.addTagToNote(tagName, noteId)
+    Future.value(serializeTag(tag))
   }
 
   def getNote(noteId: Long): Future[Note] = {
-    val note = Database.getNote(noteId)
-    val tags = note.tagIds.map(tagId => {
-      val tag = Database.getTag(tagId)
-      Tag(tag.id, tag.name)
-    }).toSeq
-    Future.value(Note(note.id, note.name, tags))
+    val note = NoteModel.getNote(noteId)
+    Future.value(serializeNote(note))
   }
 
   def getTagsByNote(noteId: Long): Future[Seq[Tag]] = {
-    val tags = Database.getTagsByNote(noteId).map(tag =>
-      Tag(tag.id, tag.name)
-    )
-    Future.value(tags)
+    val tags = TagModel.getTagsByNote(noteId)
+    Future.value(serializeTags(tags))
   }
 
   def getNotesByTag(tagId: Long): Future[Seq[Note]] = {
-    val notes = Database.getNotesByTag(tagId).map(note => {
-      val tags = note.tagIds.map(tagId => {
-        val tag = Database.getTag(tagId)
-        Tag(tag.id, tag.name)
-      }).toSeq
-      Note(note.id, note.name, tags)
-    })
-    Future.value(notes)
+    val notes = NoteModel.getNotesByTag(tagId)
+    Future.value(serializeNotes(notes))
   }
 
   def deleteTagFromNote(tagId: Long, noteId: Long): Future[Unit] = {
-    Database.deleteTagFromNote(tagId, noteId)
+    NoteModel.deleteTagFromNote(tagId, noteId)
     Future.value(Unit)
+  }
+}
+
+trait ThriftUtil {
+  def serializeTag(tag: TagModel): Tag = {
+    Tag(tag.id, tag.name)
+  }
+
+  def serializeTags(tags: Seq[TagModel]): Seq[Tag] = {
+    tags.map { tag => serializeTag(tag) }
+  }
+
+  def serializeNote(note: NoteModel): Note = {
+    Note(note.id, note.name, serializeTags(TagModel.getTagsByNote(note.id)))
+  }
+
+  def serializeNotes(notes: Seq[NoteModel]): Seq[Note] = {
+    notes.map { note => serializeNote(note) }
   }
 }
